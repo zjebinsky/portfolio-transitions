@@ -12,10 +12,10 @@ export default function PlaygroundPage() {
   return (
     <main className="py-24 md:py-32">
       <Container>
-        <h1 className="text-4xl md:text-6xl font-medium tracking-tight mb-12">
+        <h1 className="text-[2.5rem] md:text-[3.5rem] font-medium tracking-tight mb-12">
           Playground
         </h1>
-        <p className="text-lg text-[var(--color-muted)] mb-8">
+        <p className="text-[var(--color-muted)] mb-8">
           Interactive experiments with Three.js. Drag to orbit.
         </p>
       </Container>

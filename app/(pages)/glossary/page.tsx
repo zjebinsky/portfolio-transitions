@@ -13,13 +13,13 @@ export default function GlossaryPage() {
   return (
     <main className="py-24 md:py-32">
       <Container>
-        <h1 className="text-4xl md:text-6xl font-medium tracking-tight mb-16">
+        <h1 className="text-[2.5rem] md:text-[3.5rem] font-medium tracking-tight mb-16">
           Glossary
         </h1>
         <div className="max-w-3xl divide-y divide-[var(--color-border)]">
           {terms.map(({ term, definition }) => (
             <div key={term} className="py-6 first:pt-0">
-              <dt className="text-xl font-medium mb-2">{term}</dt>
+              <dt className="text-[1.286rem] font-medium mb-2">{term}</dt>
               <dd className="text-[var(--color-muted)]">{definition}</dd>
             </div>
           ))}

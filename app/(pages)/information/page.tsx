@@ -4,7 +4,7 @@ export default function InformationPage() {
   return (
     <main className="py-24 md:py-32">
       <Container>
-        <h1 className="text-4xl md:text-6xl font-medium tracking-tight mb-12">
+        <h1 className="text-[2.5rem] md:text-[3.5rem] font-medium tracking-tight mb-12">
           Information
         </h1>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16 max-w-4xl">
@@ -12,7 +12,7 @@ export default function InformationPage() {
             <h2 className="text-sm uppercase tracking-widest text-[var(--color-muted)] mb-4">
               About
             </h2>
-            <p className="text-lg leading-relaxed">
+            <p className="leading-relaxed">
               A digital designer focused on creating meaningful experiences
               through thoughtful design and creative technology.
             </p>
@@ -21,7 +21,7 @@ export default function InformationPage() {
             <h2 className="text-sm uppercase tracking-widest text-[var(--color-muted)] mb-4">
               Expertise
             </h2>
-            <ul className="space-y-2 text-lg">
+            <ul className="space-y-2">
               <li>UI/UX Design</li>
               <li>Motion Design</li>
               <li>Creative Development</li>

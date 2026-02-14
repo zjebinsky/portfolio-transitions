@@ -4,7 +4,7 @@ export default function CookieSettingsPage() {
   return (
     <main className="py-24 md:py-32">
       <Container>
-        <h1 className="text-4xl md:text-6xl font-medium tracking-tight mb-12">
+        <h1 className="text-[2.5rem] md:text-[3.5rem] font-medium tracking-tight mb-12">
           Cookie Settings
         </h1>
         <div className="max-w-3xl space-y-6 text-[var(--color-muted)]">

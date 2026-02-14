@@ -1,119 +1,124 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { type ReactNode, useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { usePathname } from "next/navigation";
-import { useDialKit } from "dialkit";
 import { useTransition } from "./transition-context";
 import { Menu } from "./Menu";
-import { MenuButton } from "./MenuButton";
+import { NavBar } from "./NavBar";
 
-/* ─────────────────────────────────────────────────────────
- * ANIMATION STORYBOARD — Page Transitions (Genie Effect)
- *
- * Easing philosophy (per animations.dev):
- *   - Enter/exit transitions → ease-out (fast start, settled end)
- *   - On-screen movement (scale up/down) → spring (interruptible)
- *   - Backdrop fade → ease-out, paired with page transition
- *
- * ── Open Menu (idle → menu-opening → menu-open) ──
- *    0ms   capture scrollY, clip page to 100vh, offset content
- *    0ms   page scales 1 → 0.33 via spring (interruptible)
- *  ~500ms  page settles, menu links stagger in
- *
- * ── Navigate (menu-open → navigating → scaling-up → idle) ──
- *    0ms   menu links fade out (100ms ease-out)
- *    0ms   old page: genie warp down — 600ms ease-out-quint
- *    0ms   new page: genie warp in — 600ms ease-out-quint
- *  600ms   exit completes → "scaling-up"
- *  600ms   new page scales 0.33 → 1 — spring (interruptible)
- * ~1000ms  scale-up completes → idle
- *
- * ── Close Menu (menu-open → menu-closing → idle) ──
- *    0ms   page scales 0.33 → 1 via spring
- *  ~500ms  restore scroll, switch to relative
- *
- * All values tunable via DialKit panel (top-left).
- * ───────────────────────────────────────────────────────── */
-
-/* Easing curves (animations.dev / Emil Kowalski) */
 const EASE_OUT_QUINT = [0.23, 1, 0.32, 1] as const;
 const EASE_OUT_QUART = [0.165, 0.84, 0.44, 1] as const;
 
+const GRID_PADDING_REM = 0.857;
+const GRID_COLUMNS = 12;
+const PREVIEW_SPAN = 6;
+
+function useMenuScale() {
+  const calcScale = useCallback(() => {
+    if (typeof window === "undefined") return 0.5;
+    const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const padding = GRID_PADDING_REM * rem;
+    return (PREVIEW_SPAN / GRID_COLUMNS) * (window.innerWidth - padding * 2) / window.innerWidth;
+  }, []);
+  const [scale, setScale] = useState(calcScale);
+  useEffect(() => {
+    const update = () => setScale(calcScale());
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [calcScale]);
+  return scale;
+}
+
+const SCALE_MENU = 0.33; // fallback, overridden by useMenuScale
+const SCALE_NAV = 0.8;
+const RADIUS_OPEN = 12;
+const GENIE_ROTATE_X = 25;
+const GENIE_SCALE_X = 0.6;
+const GENIE_PERSPECTIVE = 1200;
+const GENIE_DURATION = 0.6;
+
+const PAGE_SPRING = { type: "spring" as const, duration: 0.5, bounce: 0.15 };
+const SCALE_UP_SPRING = { type: "spring" as const, duration: 0.5, bounce: 0.1 };
+
 export function TransitionLayout({ children }: { children: ReactNode }) {
-  const { phase, savedScrollY, onPhaseComplete } = useTransition();
+  const { phase, isFixed, savedScrollY, onPhaseComplete } = useTransition();
   const pathname = usePathname();
   const shouldReduceMotion = useReducedMotion();
+  const scaleMenu = useMenuScale();
 
-  /* ── DialKit: live-tunable animation params ── */
-  const page = useDialKit("Page", {
-    scaleDown:    [0.33, 0.1, 0.8],
-    radiusOpen:   [12, 0, 40],
-    spring: {
-      type: "spring" as const,
-      duration: 0.5,
-      bounce: 0.15,
-    },
-  });
+  const getTargetScale = () => {
+    switch (phase) {
+      case "menu-opening":
+      case "menu-open":
+        return scaleMenu;
+      case "menu-to-nav":
+      case "direct-navigating":
+      case "navigating":
+        return SCALE_NAV;
+      case "direct-scaling-up":
+      case "scaling-up":
+      case "idle":
+      default:
+        return 1;
+    }
+  };
 
-  const genie = useDialKit("Genie", {
-    rotateX:     [25, 0, 60],
-    scaleX:      [0.6, 0.2, 1],
-    perspective: [1200, 400, 3000],
-    duration:    [0.6, 0.2, 1.5],
-  });
+  const targetScale = getTargetScale();
+  const isScaledDown = targetScale < 1;
 
-  const scaleUp = useDialKit("Scale Up", {
-    spring: {
-      type: "spring" as const,
-      duration: 0.5,
-      bounce: 0.1,
-    },
-  });
-
-  // Container stays fixed for all non-idle phases
-  const isOpen = phase !== "idle";
-
-  // Page stays scaled down during these phases
-  const isScaledDown =
-    phase === "menu-opening" ||
-    phase === "menu-open" ||
-    phase === "navigating";
-
-  // Duration-based ease-out for enter/exit (predetermined, not interruptible)
   const genieTransition = {
-    duration: genie.duration,
+    duration: GENIE_DURATION,
     ease: EASE_OUT_QUINT as [number, number, number, number],
   };
 
-  // Backdrop matches page transition timing (paired elements rule)
+  const getAnimateTransition = () => {
+    switch (phase) {
+      case "navigating":
+      case "direct-navigating":
+        return genieTransition;
+      case "scaling-up":
+      case "direct-scaling-up":
+        return SCALE_UP_SPRING;
+      default:
+        return PAGE_SPRING;
+    }
+  };
+
+  const backdropOpacity = (() => {
+    if (phase === "idle") return 0;
+    if (phase === "direct-navigating" || phase === "direct-scaling-up") return 0.6;
+    return 1;
+  })();
+
   const backdropTransition = {
-    duration: isOpen ? 0.3 : 0.25,
+    duration: isFixed ? 0.3 : 0.25,
     ease: EASE_OUT_QUART as [number, number, number, number],
   };
 
+  const isEnteringPage =
+    phase === "navigating" || phase === "direct-navigating";
+
   return (
     <>
-      {/* Black backdrop — paired with page, same easing family */}
       <motion.div
         className="fixed inset-0 bg-black"
         style={{ zIndex: 0 }}
         initial={{ opacity: 0 }}
-        animate={{ opacity: isOpen ? 1 : 0 }}
+        animate={{ opacity: backdropOpacity }}
         transition={backdropTransition}
       />
 
-      {/* Menu overlay (z-30) */}
       <Menu />
 
-      {/* Page shell (z-10) — perspective container for genie 3D */}
       <div
         className={`origin-center ${
-          isOpen ? "fixed inset-0 overflow-hidden" : "relative min-h-screen"
+          isFixed ? "fixed inset-0 overflow-hidden" : "relative min-h-screen"
         }`}
         style={{
           zIndex: 10,
-          perspective: genie.perspective,
+          perspective: GENIE_PERSPECTIVE,
         }}
       >
         <AnimatePresence
@@ -121,6 +126,8 @@ export function TransitionLayout({ children }: { children: ReactNode }) {
           onExitComplete={() => {
             if (phase === "navigating") {
               onPhaseComplete("navigating");
+            } else if (phase === "direct-navigating") {
+              onPhaseComplete("direct-navigating");
             }
           }}
         >
@@ -129,48 +136,40 @@ export function TransitionLayout({ children }: { children: ReactNode }) {
             className="bg-[var(--color-bg)]"
             style={{
               willChange: "transform",
-              height: isOpen ? "100vh" : "auto",
+              height: isFixed ? "100vh" : "auto",
               minHeight: "100vh",
-              overflow: isOpen ? "hidden" : "visible",
+              overflow: isFixed ? "hidden" : "visible",
               transformOrigin: "center center",
             }}
-            /* ── Initial: new page warps in from above ── */
             initial={
               shouldReduceMotion
                 ? false
-                : phase === "navigating"
+                : isEnteringPage
                   ? {
                       y: "-110vh",
-                      scale: page.scaleDown,
-                      scaleX: genie.scaleX,
-                      rotateX: -genie.rotateX,
-                      borderRadius: page.radiusOpen,
+                      scale: SCALE_NAV,
+                      scaleX: GENIE_SCALE_X,
+                      rotateX: -GENIE_ROTATE_X,
+                      borderRadius: RADIUS_OPEN,
                       transformOrigin: "top center",
                     }
                   : false
             }
-            /* ── Animate ── */
             animate={{
               y: 0,
-              scale:        isScaledDown ? page.scaleDown : 1,
+              scale:        targetScale,
               scaleX:       1,
               rotateX:      0,
-              borderRadius: isScaledDown ? page.radiusOpen : 0,
+              borderRadius: isScaledDown ? RADIUS_OPEN : 0,
               transformOrigin: "center center",
-              transition:
-                phase === "navigating"
-                  ? genieTransition                    // ease-out for enter
-                  : phase === "scaling-up"
-                    ? scaleUp.spring                   // spring for scale-up
-                    : page.spring,                     // spring for menu open/close
+              transition:   getAnimateTransition(),
             }}
-            /* ── Exit: old page genie-warps down (ease-out) ── */
             exit={{
               y:               "110vh",
-              scale:           page.scaleDown,
-              scaleX:          genie.scaleX,
-              rotateX:         genie.rotateX,
-              borderRadius:    page.radiusOpen,
+              scale:           SCALE_NAV,
+              scaleX:          GENIE_SCALE_X,
+              rotateX:         GENIE_ROTATE_X,
+              borderRadius:    RADIUS_OPEN,
               transformOrigin: "bottom center",
               transition:      genieTransition,
             }}
@@ -181,13 +180,17 @@ export function TransitionLayout({ children }: { children: ReactNode }) {
                 onPhaseComplete("menu-closing");
               } else if (phase === "scaling-up") {
                 onPhaseComplete("scaling-up");
+              } else if (phase === "direct-scaling-up") {
+                onPhaseComplete("direct-scaling-up");
+              } else if (phase === "menu-to-nav") {
+                onPhaseComplete("menu-to-nav");
               }
             }}
           >
             <div
               style={{
                 transform:
-                  isOpen && phase !== "scaling-up"
+                  isFixed && phase !== "scaling-up" && phase !== "direct-scaling-up"
                     ? `translateY(-${savedScrollY}px)`
                     : "none",
               }}
@@ -198,8 +201,7 @@ export function TransitionLayout({ children }: { children: ReactNode }) {
         </AnimatePresence>
       </div>
 
-      {/* Menu button (z-50) */}
-      <MenuButton />
+      <NavBar />
     </>
   );
 }

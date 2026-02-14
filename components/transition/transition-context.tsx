@@ -16,18 +16,23 @@ export type TransitionPhase =
   | "idle"
   | "menu-opening"
   | "menu-open"
+  | "menu-to-nav"
   | "navigating"
   | "scaling-up"
-  | "menu-closing";
+  | "menu-closing"
+  | "direct-navigating"
+  | "direct-scaling-up";
 
 interface TransitionContextValue {
   phase: TransitionPhase;
   isMenuOpen: boolean;
+  isFixed: boolean;
   targetPath: string | null;
   savedScrollY: number;
   openMenu: () => void;
   closeMenu: () => void;
   navigateTo: (path: string) => void;
+  navigateDirect: (path: string) => void;
   onPhaseComplete: (completedPhase: TransitionPhase) => void;
 }
 
@@ -39,9 +44,9 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<TransitionPhase>("idle");
   const [targetPath, setTargetPath] = useState<string | null>(null);
   const scrollYRef = useRef(0);
+  const targetPathRef = useRef<string | null>(null);
   const [savedScrollY, setSavedScrollY] = useState(0);
 
-  // Prefetch all routes on mount so pages are ready for instant transitions
   useEffect(() => {
     allRoutes.forEach((route) => router.prefetch(route.path));
   }, [router]);
@@ -60,6 +65,25 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
     setPhase("menu-closing");
   }, [phase]);
 
+  // Type A: Direct navigation from inline nav links (idle → direct-navigating → direct-scaling-up → idle)
+  const navigateDirect = useCallback(
+    (path: string) => {
+      if (phase !== "idle") return;
+      if (path === pathname) return;
+      const y = window.scrollY;
+      scrollYRef.current = y;
+      setSavedScrollY(y);
+      document.body.classList.add("menu-open");
+      targetPathRef.current = path;
+      setTargetPath(path);
+      setPhase("direct-navigating");
+      router.push(path);
+    },
+    [phase, pathname, router]
+  );
+
+  // Type B: Navigation from menu (menu-open → menu-to-nav → navigating → scaling-up → idle)
+  // Defers router.push until menu-to-nav animation completes (0.33 → 0.80)
   const navigateTo = useCallback(
     (path: string) => {
       if (phase !== "menu-open") return;
@@ -67,11 +91,11 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
         setPhase("menu-closing");
         return;
       }
+      targetPathRef.current = path;
       setTargetPath(path);
-      setPhase("navigating");
-      router.push(path);
+      setPhase("menu-to-nav");
     },
-    [phase, pathname, router]
+    [phase, pathname]
   );
 
   const onPhaseComplete = useCallback(
@@ -89,14 +113,26 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
           });
           break;
         }
+        case "menu-to-nav":
+          // Scaled from 0.33 → 0.80, now push route and start genie swap
+          if (targetPathRef.current) {
+            router.push(targetPathRef.current);
+          }
+          setPhase("navigating");
+          break;
+        case "direct-navigating":
+          // Old page exited at 0.80 scale, new page entering
+          setPhase("direct-scaling-up");
+          break;
         case "navigating":
-          // Old page has exited, new page is at 0.33 scale
-          // Now scale up while keeping fixed positioning
+          // Old page has exited, new page is at 0.80 scale
           setPhase("scaling-up");
           break;
+        case "direct-scaling-up":
         case "scaling-up":
           // New page has finished scaling to 1
           document.body.classList.remove("menu-open");
+          targetPathRef.current = null;
           setTargetPath(null);
           setPhase("idle");
           requestAnimationFrame(() => {
@@ -105,26 +141,31 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
           break;
       }
     },
-    []
+    [router]
   );
 
   const isMenuOpen =
     phase === "menu-opening" ||
     phase === "menu-open" ||
+    phase === "menu-to-nav" ||
     phase === "navigating" ||
     phase === "scaling-up" ||
     phase === "menu-closing";
+
+  const isFixed = phase !== "idle";
 
   return (
     <TransitionContext.Provider
       value={{
         phase,
         isMenuOpen,
+        isFixed,
         targetPath,
         savedScrollY,
         openMenu,
         closeMenu,
         navigateTo,
+        navigateDirect,
         onPhaseComplete,
       }}
     >
