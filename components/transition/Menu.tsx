@@ -23,7 +23,7 @@ import { useEffect } from "react";
  * ───────────────────────────────────────────────────────── */
 
 /* ease-out-cubic: fast start, gentle settle — best for enter/exit */
-const EASE_OUT = [0.215, 0.61, 0.355, 1];
+const EASE_OUT = [0.215, 0.61, 0.355, 1] as const;
 
 /* Primary nav links (large, white) */
 const PRIMARY = {

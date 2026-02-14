@@ -83,13 +83,13 @@ export function TransitionLayout({ children }: { children: ReactNode }) {
   // Duration-based ease-out for enter/exit (predetermined, not interruptible)
   const genieTransition = {
     duration: genie.duration,
-    ease: EASE_OUT_QUINT as unknown as number[],
+    ease: EASE_OUT_QUINT as [number, number, number, number],
   };
 
   // Backdrop matches page transition timing (paired elements rule)
   const backdropTransition = {
     duration: isOpen ? 0.3 : 0.25,
-    ease: EASE_OUT_QUART as unknown as number[],
+    ease: EASE_OUT_QUART as [number, number, number, number],
   };
 
   return (
