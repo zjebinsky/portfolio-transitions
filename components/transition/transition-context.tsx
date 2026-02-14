@@ -50,7 +50,7 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
   const lockScroll = useCallback(() => {
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
     document.body.style.paddingRight = `${scrollbarWidth}px`;
-    lockScroll();
+    document.body.classList.add("menu-open");
   }, []);
 
   const unlockScroll = useCallback(() => {
