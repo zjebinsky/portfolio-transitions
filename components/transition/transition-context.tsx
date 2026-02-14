@@ -47,6 +47,17 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
   const targetPathRef = useRef<string | null>(null);
   const [savedScrollY, setSavedScrollY] = useState(0);
 
+  const lockScroll = useCallback(() => {
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
+    lockScroll();
+  }, []);
+
+  const unlockScroll = useCallback(() => {
+    document.body.classList.remove("menu-open");
+    document.body.style.paddingRight = "";
+  }, []);
+
   useEffect(() => {
     allRoutes.forEach((route) => router.prefetch(route.path));
   }, [router]);
@@ -56,9 +67,9 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
     const y = window.scrollY;
     scrollYRef.current = y;
     setSavedScrollY(y);
-    document.body.classList.add("menu-open");
+    lockScroll();
     setPhase("menu-opening");
-  }, [phase]);
+  }, [phase, lockScroll]);
 
   const closeMenu = useCallback(() => {
     if (phase !== "menu-open") return;
@@ -73,13 +84,13 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
       const y = window.scrollY;
       scrollYRef.current = y;
       setSavedScrollY(y);
-      document.body.classList.add("menu-open");
+      lockScroll();
       targetPathRef.current = path;
       setTargetPath(path);
       setPhase("direct-navigating");
       router.push(path);
     },
-    [phase, pathname, router]
+    [phase, pathname, router, lockScroll]
   );
 
   // Type B: Navigation from menu (menu-open → menu-to-nav → navigating → scaling-up → idle)
@@ -105,7 +116,7 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
           setPhase("menu-open");
           break;
         case "menu-closing": {
-          document.body.classList.remove("menu-open");
+          unlockScroll();
           const savedY = scrollYRef.current;
           setPhase("idle");
           requestAnimationFrame(() => {
@@ -131,7 +142,7 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
         case "direct-scaling-up":
         case "scaling-up":
           // New page has finished scaling to 1
-          document.body.classList.remove("menu-open");
+          unlockScroll();
           targetPathRef.current = null;
           setTargetPath(null);
           setPhase("idle");
@@ -141,7 +152,7 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
           break;
       }
     },
-    [router]
+    [router, unlockScroll]
   );
 
   const isMenuOpen =

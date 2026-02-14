@@ -8,7 +8,7 @@ import { usePathname } from "next/navigation";
 const EASE_OUT = [0.215, 0.61, 0.355, 1] as const;
 
 export function NavBar() {
-  const { phase, openMenu, closeMenu, navigateTo, navigateDirect } =
+  const { phase, isFixed, openMenu, closeMenu, navigateTo, navigateDirect } =
     useTransition();
   const pathname = usePathname();
 
@@ -44,9 +44,11 @@ export function NavBar() {
     phase === "menu-open" ||
     phase === "menu-to-nav";
 
+  const textColor = isFixed ? "text-white" : "text-black";
+
   return (
     <nav
-      className="fixed top-0 left-0 right-0 z-50 grid grid-cols-12 text-white mix-blend-difference"
+      className={`fixed top-0 left-0 right-0 z-50 grid grid-cols-12 transition-colors duration-300 ${textColor}`}
       style={{ padding: "0.857rem" }}
     >
       {/* Col 1: Name */}
